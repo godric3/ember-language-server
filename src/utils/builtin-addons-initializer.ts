@@ -5,6 +5,7 @@ import CoreScriptDefinitionProvider from './../builtin-addons/core/script-defini
 import CoreTemplateDefinitionProvider from './../builtin-addons/core/template-definition-provider';
 import ScriptCompletionProvider from './../builtin-addons/core/script-completion-provider';
 import TemplateCompletionProvider from './../builtin-addons/core/template-completion-provider';
+import IntlCompletionProvider from '../builtin-addons/core/intl-completion-provider';
 import { ProjectProviders } from './addon-api';
 
 export function initBuiltinProviders(): ProjectProviders {
@@ -12,6 +13,7 @@ export function initBuiltinProviders(): ProjectProviders {
   const templateDefinition = new CoreTemplateDefinitionProvider();
   const scriptCompletion = new ScriptCompletionProvider();
   const templateCompletion = new TemplateCompletionProvider();
+  const intlCompletion = new IntlCompletionProvider();
 
   const templateLintFixesCodeAction = new TemplateLintFixesCodeAction();
   const templateLintCommentsCodeAction = new TemplateLintCommentsCodeAction();
@@ -36,6 +38,10 @@ export function initBuiltinProviders(): ProjectProviders {
     ],
     info: [],
     addonsMeta: [],
-    completionProviders: [scriptCompletion.onComplete.bind(scriptCompletion), templateCompletion.onComplete.bind(templateCompletion)],
+    completionProviders: [
+      scriptCompletion.onComplete.bind(scriptCompletion),
+      templateCompletion.onComplete.bind(templateCompletion),
+      intlCompletion.onComplete.bind(intlCompletion),
+    ],
   };
 }
