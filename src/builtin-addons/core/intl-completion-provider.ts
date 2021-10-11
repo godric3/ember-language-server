@@ -68,30 +68,9 @@ export default class IntlCompletionProvider {
   getTranslations(root: string): TranslationsHashMap {
     const hashMap = {};
     const intlEntry = path.join(root, 'translations');
-    const i18nEntry = path.join(root, 'app', 'locales');
 
     if (fs.existsSync(intlEntry)) {
       this.recursiveIntlTranslationsSearch(hashMap, intlEntry);
-    } else if (fs.existsSync(i18nEntry)) {
-      const localizations = fs.readdirSync(i18nEntry);
-
-      localizations.forEach((locale) => {
-        let possibleFilePath = path.join(i18nEntry, locale, 'translations.js');
-
-        if (!fs.existsSync(possibleFilePath)) {
-          possibleFilePath = path.join(i18nEntry, locale, 'translations.json');
-        }
-
-        if (fs.existsSync(possibleFilePath)) {
-          try {
-            const file = this.objFromFile(possibleFilePath);
-
-            this.addToHashMap(hashMap, file, locale);
-          } catch (e) {
-            logDebugInfo('error', e);
-          }
-        }
-      });
     }
 
     return hashMap;
