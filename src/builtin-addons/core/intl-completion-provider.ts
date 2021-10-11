@@ -1,15 +1,16 @@
 import * as flat from 'flat';
 import * as yaml from 'js-yaml';
-import * as fs from 'fs';
 import * as path from 'path';
 import { CompletionItem, CompletionItemKind } from 'vscode-languageserver-types';
-import { CompletionFunctionParams } from '../..';
+import { CompletionFunctionParams, Server } from '../..';
 import ASTPath from '../../glimmer-utils';
 import { logDebugInfo } from '../../utils/logger';
 
 type TranslationsHashMap = Record<string, [string, string][]>;
 
 export default class IntlCompletionProvider {
+  server: Server;
+
   addToHashMap(hash: TranslationsHashMap, obj: unknown, locale: string) {
     const items: Record<string, string> = flat(obj);
 
@@ -22,18 +23,36 @@ export default class IntlCompletionProvider {
     });
   }
 
-  objFromFile(filePath: string): unknown {
+  async objFromFile(filePath: string): Promise<unknown> {
     const ext = path.extname(filePath);
 
     if (ext === '.yaml') {
-      return yaml.load(fs.readFileSync(filePath, 'utf8'));
+      const content = await this.server.fs.readFile(filePath);
+
+      if (content == null) {
+        return;
+      }
+
+      return yaml.load(content);
     } else if (ext === '.json') {
-      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const content = await this.server.fs.readFile(filePath);
+
+      if (content == null) {
+        return;
+      }
+
+      return JSON.parse(content);
     } else if (ext === '.js') {
       try {
         return require(filePath);
       } catch (e) {
-        let content = fs.readFileSync(filePath, 'utf8').replace('export ', '').replace('default ', '').trim();
+        let content = await this.server.fs.readFile(filePath);
+
+        if (content == null) {
+          return;
+        }
+
+        content.replace('export ', '').replace('default ', '').trim();
 
         if (content.endsWith(';')) {
           content = content.slice(0, content.lastIndexOf(';'));
@@ -44,37 +63,43 @@ export default class IntlCompletionProvider {
     }
   }
 
-  recursiveIntlTranslationsSearch(hashMap: TranslationsHashMap, startPath: string) {
-    const localizations = fs.readdirSync(startPath);
+  async recursiveIntlTranslationsSearch(hashMap: TranslationsHashMap, startPath: string) {
+    const localizations = await this.server.fs.readDirectory(startPath);
 
-    localizations.forEach((fileName) => {
+    for (const [fileName] of localizations) {
       const extName = path.extname(fileName);
       const localization = path.basename(fileName, extName);
       const filePath = path.join(startPath, fileName);
 
       try {
-        if (fs.lstatSync(filePath).isDirectory()) {
-          this.recursiveIntlTranslationsSearch(hashMap, filePath);
+        const fileStats = await this.server.fs.stat(filePath);
+
+        if (fileStats.isDirectory()) {
+          await this.recursiveIntlTranslationsSearch(hashMap, filePath);
         } else {
-          const file = this.objFromFile(filePath);
+          const file = await this.objFromFile(filePath);
 
           this.addToHashMap(hashMap, file, localization);
         }
       } catch (e) {
         logDebugInfo('error', e);
       }
-    });
+    }
   }
-  getTranslations(root: string): TranslationsHashMap {
+
+  async getTranslations(root: string): Promise<TranslationsHashMap> {
     const hashMap = {};
     const intlEntry = path.join(root, 'translations');
 
-    if (fs.existsSync(intlEntry)) {
-      this.recursiveIntlTranslationsSearch(hashMap, intlEntry);
+    const intlEntryExists = await this.server.fs.exists(intlEntry);
+
+    if (intlEntryExists) {
+      await this.recursiveIntlTranslationsSearch(hashMap, intlEntry);
     }
 
     return hashMap;
   }
+
   isLocalizationHelperTranslataionName(focusPath: ASTPath, type: 'script' | 'template') {
     const p = focusPath.parent;
 
@@ -96,11 +121,16 @@ export default class IntlCompletionProvider {
       p.path.original === 't'
     );
   }
+
+  async onInit(server: Server) {
+    this.server = server;
+  }
+
   async onComplete(root: string, params: CompletionFunctionParams): Promise<CompletionItem[]> {
     const { focusPath, position, results, type } = params;
 
     if (this.isLocalizationHelperTranslataionName(focusPath, type)) {
-      const items = this.getTranslations(root);
+      const items = await this.getTranslations(root);
       const PLACEHOLDER = 'ELSCompletionDummy';
       const node = focusPath.node as any;
       let indexOfPlaceholder = node.value.indexOf(PLACEHOLDER);
