@@ -43,24 +43,6 @@ export default class IntlCompletionProvider {
       }
 
       return JSON.parse(content);
-    } else if (ext === '.js') {
-      try {
-        return require(filePath);
-      } catch (e) {
-        let content = await this.server.fs.readFile(filePath);
-
-        if (content == null) {
-          return;
-        }
-
-        content.replace('export ', '').replace('default ', '').trim();
-
-        if (content.endsWith(';')) {
-          content = content.slice(0, content.lastIndexOf(';'));
-        }
-
-        return eval('[' + content + ']')[0];
-      }
     }
   }
 
