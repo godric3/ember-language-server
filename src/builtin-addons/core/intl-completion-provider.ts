@@ -2,14 +2,15 @@ import * as flat from 'flat';
 import * as yaml from 'js-yaml';
 import * as path from 'path';
 import { CompletionItem, CompletionItemKind } from 'vscode-languageserver-types';
-import { CompletionFunctionParams, Server } from '../..';
+import { CompletionFunctionParams, Project, Server } from '../..';
 import ASTPath from '../../glimmer-utils';
-import { logDebugInfo } from '../../utils/logger';
+import { logDebugInfo, logInfo } from '../../utils/logger';
 
 type TranslationsHashMap = Record<string, [string, string][]>;
 
 export default class IntlCompletionProvider {
   server: Server;
+  intlAddonOnProjectPresent: boolean;
 
   addToHashMap(hash: TranslationsHashMap, obj: unknown, locale: string) {
     const items: Record<string, string> = flat(obj);
@@ -122,14 +123,20 @@ export default class IntlCompletionProvider {
     );
   }
 
-  async onInit(server: Server) {
+  async onInit(server: Server, project: Project) {
     this.server = server;
+    const elsIntlAddon = project.addonsMeta.find((addon) => addon.name == 'els-intl-addon');
+
+    if (elsIntlAddon != null) {
+      this.intlAddonOnProjectPresent = true;
+      logInfo('Detected project installed `els-intl-addon`, builtin intl addon will be disabled');
+    }
   }
 
   async onComplete(root: string, params: CompletionFunctionParams): Promise<CompletionItem[]> {
     const { focusPath, position, results, type } = params;
 
-    if (this.isLocalizationHelperTranslataionName(focusPath, type)) {
+    if (!this.intlAddonOnProjectPresent && this.isLocalizationHelperTranslataionName(focusPath, type)) {
       const items = await this.getTranslations(root);
       const PLACEHOLDER = 'ELSCompletionDummy';
       const node = focusPath.node as any;
