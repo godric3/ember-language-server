@@ -1,12 +1,11 @@
 import * as cp from 'child_process';
-import * as path from 'path';
 import { Readable, Writable } from 'stream';
 import { createMessageConnection, Disposable, Logger, MessageConnection } from 'vscode-jsonrpc';
 import { StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node';
 import { Project, Server } from '../../../src';
 import IntlCompletionProvider from '../../../src/builtin-addons/core/intl-completion-provider';
 import { fsProvider } from '../../../src/fs-provider';
-import { asyncFSProvider, registerCommandExecutor, startServer } from '../../test_helpers/integration-helpers';
+import { asyncFSProvider, createProject, registerCommandExecutor, startServer } from '../../test_helpers/integration-helpers';
 
 const testCaseAsyncFsOptions = [false, true];
 
@@ -64,17 +63,41 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
 
     describe('empty autocomplete', () => {
       let intlCompletionProvider: IntlCompletionProvider;
+      let project: any;
 
-      beforeEach(() => {
+      beforeEach(async () => {
         intlCompletionProvider = new IntlCompletionProvider();
         const server = {
           fs: fsProvider(),
         };
-        const project = {
+        const projectInfo = {
           addonsMeta: [],
         };
 
-        intlCompletionProvider.onInit(server as Server, (project as unknown) as Project);
+        const files = {
+          translations: {
+            'en-us.json': `{
+              "rootFileTranslation": "text 1"
+            }`,
+            'sub-folder': {
+              'en-us.json': `{
+                "subFolderTranslation": {
+                  "subTranslation": "text 2",
+                  "anotherTranslation": "another text"
+                }
+              }`,
+            },
+          },
+        };
+
+        project = ((await createProject(files, connection)) as unknown) as Project;
+
+        // destroyProject = destroy;
+
+        intlCompletionProvider.onInit(server as Server, (projectInfo as unknown) as Project);
+      });
+      afterEach(async () => {
+        await project.destroy();
       });
 
       it('should not autocomplete if no data', async () => {
@@ -106,13 +129,13 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
         const server = {
           fs: fsProvider(),
         };
-        const project = {
+        const projectInfo = {
           addonsMeta: [{ name: 'els-intl-addon' }],
         };
 
-        intlCompletionProvider.onInit(server as Server, (project as unknown) as Project);
+        intlCompletionProvider.onInit(server as Server, (projectInfo as unknown) as Project);
         expect(
-          await intlCompletionProvider.onComplete(path.join(__dirname, '../../../test/fixtures'), {
+          await intlCompletionProvider.onComplete(project.normalizedPath, {
             results: [],
             type: 'template',
             position: {
@@ -138,23 +161,44 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
 
     describe('provide completion', () => {
       let intlCompletionProvider: IntlCompletionProvider;
+      let project: any;
 
-      beforeEach(() => {
+      beforeEach(async () => {
         intlCompletionProvider = new IntlCompletionProvider();
         const server = {
           fs: fsProvider(),
         };
 
-        const project = {
+        const projectInfo = {
           addonsMeta: [],
         };
+        const files = {
+          translations: {
+            'en-us.json': `{
+              "rootFileTranslation": "text 1"
+            }`,
+            'sub-folder': {
+              'en-us.json': `{
+                "subFolderTranslation": {
+                  "subTranslation": "text 2",
+                  "anotherTranslation": "another text"
+                }
+              }`,
+            },
+          },
+        };
 
-        intlCompletionProvider.onInit(server as Server, (project as unknown) as Project);
+        project = await createProject(files, connection);
+
+        intlCompletionProvider.onInit(server as Server, (projectInfo as unknown) as Project);
+      });
+      afterEach(async () => {
+        await project.destroy();
       });
 
       it('should autocomplete root translation in handlebars', async () => {
         expect(
-          await intlCompletionProvider.onComplete(path.join(__dirname, '../../../test/fixtures'), {
+          await intlCompletionProvider.onComplete(project.normalizedPath, {
             results: [],
             type: 'template',
             position: {
@@ -198,7 +242,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
 
       it('should respect placeholder position in handlebars', async () => {
         expect(
-          await intlCompletionProvider.onComplete(path.join(__dirname, '../../../test/fixtures'), {
+          await intlCompletionProvider.onComplete(project.normalizedPath, {
             results: [],
             type: 'template',
             position: {
@@ -242,7 +286,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
 
       it('should autocomplete sub folder translation in handlebars', async () => {
         expect(
-          await intlCompletionProvider.onComplete(path.join(__dirname, '../../../test/fixtures'), {
+          await intlCompletionProvider.onComplete(project.normalizedPath, {
             results: [],
             type: 'template',
             position: {
@@ -309,7 +353,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
         };
 
         expect(
-          await intlCompletionProvider.onComplete(path.join(__dirname, '../../../test/fixtures'), {
+          await intlCompletionProvider.onComplete(project.normalizedPath, {
             results: [],
             type: 'script',
             position: {
@@ -361,7 +405,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
           type: 'StringLiteral',
           value: 'subFolderTranslation.another',
         };
-        const result = await intlCompletionProvider.onComplete(path.join(__dirname, '../../../test/fixtures'), {
+        const result = await intlCompletionProvider.onComplete(project.normalizedPath, {
           results: [],
           type: 'script',
           position: {
