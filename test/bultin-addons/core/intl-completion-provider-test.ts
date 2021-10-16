@@ -471,5 +471,145 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
         ]);
       });
     });
+
+    describe('provide completion - YAML', () => {
+      let intlCompletionProvider: IntlCompletionProvider;
+      let project: any;
+
+      beforeEach(async () => {
+        intlCompletionProvider = new IntlCompletionProvider();
+        const server = {
+          fs: fsProvider(),
+        };
+
+        const projectInfo = {
+          addonsMeta: [],
+        };
+        const files = {
+          translations: {
+            'en-us.yaml': `rootFileTranslation: text 1`,
+            'sub-folder': {
+              'en-us.yaml': `subFolderTranslation: 
+                  subTranslation: text 2
+                  anotherTranslation: another text
+                `,
+            },
+          },
+        };
+
+        project = await createProject(files, connection);
+
+        intlCompletionProvider.onInit(server as Server, (projectInfo as unknown) as Project);
+      });
+      afterEach(async () => {
+        await project.destroy();
+      });
+
+      it('should autocomplete root translation in handlebars', async () => {
+        expect(
+          await intlCompletionProvider.onComplete(project.normalizedPath, {
+            results: [],
+            type: 'template',
+            position: {
+              character: 19,
+              line: 1,
+            },
+            focusPath: {
+              node: {
+                type: 'StringLiteral',
+                value: 'rootFileTranslaELSCompletionDummy',
+              },
+              parent: {
+                type: 'MustacheStatement',
+                path: {
+                  original: 't',
+                },
+              },
+            },
+          } as any)
+        ).toEqual([
+          {
+            detail: 'en-us : text 1',
+            kind: 12,
+            label: 'rootFileTranslation',
+            textEdit: {
+              newText: 'rootFileTranslation',
+              range: {
+                end: {
+                  character: 4,
+                  line: 1,
+                },
+                start: {
+                  character: 4,
+                  line: 1,
+                },
+              },
+            },
+          },
+        ]);
+      });
+
+      it('should autocomplete sub folder translation in handlebars', async () => {
+        expect(
+          await intlCompletionProvider.onComplete(project.normalizedPath, {
+            results: [],
+            type: 'template',
+            position: {
+              character: 19,
+              line: 1,
+            },
+            focusPath: {
+              node: {
+                type: 'StringLiteral',
+                value: 'subFolderTranslatELSCompletionDummy',
+              },
+              parent: {
+                type: 'MustacheStatement',
+                path: {
+                  original: 't',
+                },
+              },
+            },
+          } as any)
+        ).toEqual([
+          {
+            detail: 'en-us : text 2',
+            kind: 12,
+            label: 'subFolderTranslation.subTranslation',
+            textEdit: {
+              newText: 'subFolderTranslation.subTranslation',
+              range: {
+                end: {
+                  character: 2,
+                  line: 1,
+                },
+                start: {
+                  character: 2,
+                  line: 1,
+                },
+              },
+            },
+          },
+          {
+            detail: 'en-us : another text',
+            kind: 12,
+            label: 'subFolderTranslation.anotherTranslation',
+            textEdit: {
+              newText: 'subFolderTranslation.anotherTranslation',
+              range: {
+                end: {
+                  character: 2,
+                  line: 1,
+                },
+                start: {
+                  character: 2,
+                  line: 1,
+                },
+              },
+            },
+          },
+        ]);
+      });
+    });
   });
 }
