@@ -6,43 +6,50 @@ import CoreTemplateDefinitionProvider from './../builtin-addons/core/template-de
 import ScriptCompletionProvider from './../builtin-addons/core/script-completion-provider';
 import TemplateCompletionProvider from './../builtin-addons/core/template-completion-provider';
 import IntlCompletionProvider from '../builtin-addons/core/intl-completion-provider';
-import { ProjectProviders } from './addon-api';
+import { AddonMeta, ProjectProviders } from './addon-api';
 
-export function initBuiltinProviders(): ProjectProviders {
+export function initBuiltinProviders(addonsMeta: AddonMeta[]): ProjectProviders {
   const scriptDefinition = new CoreScriptDefinitionProvider();
   const templateDefinition = new CoreTemplateDefinitionProvider();
   const scriptCompletion = new ScriptCompletionProvider();
   const templateCompletion = new TemplateCompletionProvider();
-  const intlCompletion = new IntlCompletionProvider();
 
   const templateLintFixesCodeAction = new TemplateLintFixesCodeAction();
   const templateLintCommentsCodeAction = new TemplateLintCommentsCodeAction();
   const typedTemplatesCodeAction = new TypedTemplatesCodeAction();
 
+  const definitionProviders = [scriptDefinition.onDefinition.bind(scriptDefinition), templateDefinition.onDefinition.bind(templateDefinition)];
+  const referencesProviders: any[] = [];
+  const codeActionProviders = [
+    templateLintFixesCodeAction.onCodeAction.bind(templateLintFixesCodeAction),
+    templateLintCommentsCodeAction.onCodeAction.bind(templateLintCommentsCodeAction),
+    typedTemplatesCodeAction.onCodeAction.bind(typedTemplatesCodeAction),
+  ];
+  const initFunctions = [
+    templateLintFixesCodeAction.onInit.bind(templateLintFixesCodeAction),
+    templateLintCommentsCodeAction.onInit.bind(templateLintCommentsCodeAction),
+    typedTemplatesCodeAction.onInit.bind(typedTemplatesCodeAction),
+    templateCompletion.initRegistry.bind(templateCompletion),
+    scriptCompletion.initRegistry.bind(scriptCompletion),
+    templateDefinition.onInit.bind(templateDefinition),
+    scriptDefinition.onInit.bind(scriptDefinition),
+  ];
+  const completionProviders = [scriptCompletion.onComplete.bind(scriptCompletion), templateCompletion.onComplete.bind(templateCompletion)];
+
+  if (!addonsMeta.find((addon) => addon.name == 'els-intl-addon')) {
+    const intlCompletion = new IntlCompletionProvider();
+
+    initFunctions.push(intlCompletion.onInit.bind(intlCompletion));
+    completionProviders.push(intlCompletion.onComplete.bind(intlCompletion));
+  }
+
   return {
-    definitionProviders: [scriptDefinition.onDefinition.bind(scriptDefinition), templateDefinition.onDefinition.bind(templateDefinition)],
-    referencesProviders: [],
-    codeActionProviders: [
-      templateLintFixesCodeAction.onCodeAction.bind(templateLintFixesCodeAction),
-      templateLintCommentsCodeAction.onCodeAction.bind(templateLintCommentsCodeAction),
-      typedTemplatesCodeAction.onCodeAction.bind(typedTemplatesCodeAction),
-    ],
-    initFunctions: [
-      templateLintFixesCodeAction.onInit.bind(templateLintFixesCodeAction),
-      templateLintCommentsCodeAction.onInit.bind(templateLintCommentsCodeAction),
-      typedTemplatesCodeAction.onInit.bind(typedTemplatesCodeAction),
-      templateCompletion.initRegistry.bind(templateCompletion),
-      scriptCompletion.initRegistry.bind(scriptCompletion),
-      templateDefinition.onInit.bind(templateDefinition),
-      scriptDefinition.onInit.bind(scriptDefinition),
-      intlCompletion.onInit.bind(intlCompletion),
-    ],
+    definitionProviders,
+    referencesProviders,
+    codeActionProviders,
+    initFunctions,
     info: [],
     addonsMeta: [],
-    completionProviders: [
-      scriptCompletion.onComplete.bind(scriptCompletion),
-      templateCompletion.onComplete.bind(templateCompletion),
-      intlCompletion.onComplete.bind(intlCompletion),
-    ],
+    completionProviders,
   };
 }
