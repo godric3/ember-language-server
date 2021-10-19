@@ -3,12 +3,22 @@ import { Readable, Writable } from 'stream';
 import { createMessageConnection, Disposable, Logger, MessageConnection } from 'vscode-jsonrpc';
 import { StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node';
 import { CompletionRequest } from 'vscode-languageserver-protocol';
-import { Project, Server } from '../../../src';
-import IntlCompletionProvider from '../../../src/builtin-addons/core/intl-completion-provider';
-import { fsProvider } from '../../../src/fs-provider';
-import { asyncFSProvider, createProject, getResult, registerCommandExecutor, startServer } from '../../test_helpers/integration-helpers';
+import { asyncFSProvider, getResult, initServer, registerCommandExecutor, startServer } from '../../test_helpers/integration-helpers';
 
 const testCaseAsyncFsOptions = [false, true];
+const translations = {
+  'en-us.json': `{
+    "rootFileTranslation": "text 1"
+  }`,
+  'sub-folder': {
+    'en-us.json': `{
+      "subFolderTranslation": {
+        "subTranslation": "text 2",
+        "anotherTranslation": "another text"
+      }
+    }`,
+  },
+};
 
 for (const asyncFsEnabled of testCaseAsyncFsOptions) {
   describe(`Intl - async fs enabled: ${asyncFsEnabled.toString()}`, function () {
@@ -44,6 +54,8 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
         disposables.push(await registerCommandExecutor(connection, asyncFSProviderInstance));
       }
 
+      await initServer(connection, 'full-project');
+
       await new Promise((resolve) => setTimeout(resolve, 1000));
     });
 
@@ -63,164 +75,84 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
     });
 
     describe('empty autocomplete', () => {
-      let intlCompletionProvider: IntlCompletionProvider;
-      let project: any;
-
-      beforeEach(async () => {
-        // intlCompletionProvider = new IntlCompletionProvider();
-        // const server = {
-        //   fs: fsProvider(),
-        // };
-        // const projectInfo = {
-        //   addonsMeta: [],
-        // };
-        // const files = {
-        //   translations: {
-        //     'en-us.json': `{
-        //       "rootFileTranslation": "text 1"
-        //     }`,
-        //     'sub-folder': {
-        //       'en-us.json': `{
-        //         "subFolderTranslation": {
-        //           "subTranslation": "text 2",
-        //           "anotherTranslation": "another text"
-        //         }
-        //       }`,
-        //     },
-        //   },
-        // };
-        // project = ((await createProject(files, connection)) as unknown) as Project;
-        // // destroyProject = destroy;
-        // intlCompletionProvider.onInit(server as Server, (projectInfo as unknown) as Project);
-      });
-      afterEach(async () => {
-        // await project.destroy();
-      });
-
       it('should not autocomplete if no data', async () => {
         expect(
-          await getResult(
-            CompletionRequest.method,
-            connection,
-            {
-              app: {
-                components: {
-                  'test.hbs': '<p>{{t "test"}}</p>',
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': '',
+                  },
                 },
+                translations,
               },
-              translations: {
-                'en-us.json': `{
-                  "rootFileTranslation": "text 1"
-                }`,
-                'sub-folder': {
-                  'en-us.json': `{
-                    "subFolderTranslation": {
-                      "subTranslation": "text 2",
-                      "anotherTranslation": "another text"
-                    }
-                  }`,
-                },
-              },
-            },
-            'app/components/test.hbs',
-            { line: 0, character: 10 }
-          )
+              'app/components/test.hbs',
+              { line: 0, character: 0 }
+            )
+          ).response
         ).toEqual([]);
       });
 
-      it.skip('should not autocomplete if `els-intl-addon` installed', async () => {
-        const server = {
-          fs: fsProvider(),
-        };
-        const projectInfo = {
-          addonsMeta: [{ name: 'els-intl-addon' }],
-        };
-
-        intlCompletionProvider.onInit(server as Server, (projectInfo as unknown) as Project);
+      it('should not autocomplete if `els-intl-addon` installed', async () => {
         expect(
-          await intlCompletionProvider.onComplete(project.normalizedPath, {
-            results: [],
-            type: 'template',
-            position: {
-              character: 19,
-              line: 1,
-            },
-            focusPath: {
-              node: {
-                type: 'StringLiteral',
-                value: 'rootFileTranslaELSCompletionDummy',
-              },
-              parent: {
-                type: 'MustacheStatement',
-                path: {
-                  original: 't',
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                node_modules: {
+                  'els-intl-addon': {
+                    lib: {
+                      'index.js': 'module.exports.onComplete = function(root, { type }) { return null; }',
+                    },
+                    'package.json': JSON.stringify({
+                      name: 'els-intl-addon',
+                      'ember-language-server': {
+                        entry: './lib/index',
+                        capabilities: {
+                          completionProvider: true,
+                        },
+                      },
+                    }),
+                  },
                 },
+                app: {
+                  components: {
+                    'test.hbs': '{{t "rootFileTransla" }}',
+                  },
+                },
+                translations,
               },
-            },
-          } as any)
+              'app/components/test.hbs',
+              { line: 0, character: 19 }
+            )
+          ).response
         ).toEqual([]);
       });
     });
 
-    describe.skip('provide completion', () => {
-      let intlCompletionProvider: IntlCompletionProvider;
-      let project: any;
-
-      beforeEach(async () => {
-        intlCompletionProvider = new IntlCompletionProvider();
-        const server = {
-          fs: fsProvider(),
-        };
-
-        const projectInfo = {
-          addonsMeta: [],
-        };
-        const files = {
-          translations: {
-            'en-us.json': `{
-              "rootFileTranslation": "text 1"
-            }`,
-            'sub-folder': {
-              'en-us.json': `{
-                "subFolderTranslation": {
-                  "subTranslation": "text 2",
-                  "anotherTranslation": "another text"
-                }
-              }`,
-            },
-          },
-        };
-
-        project = await createProject(files, connection);
-
-        intlCompletionProvider.onInit(server as Server, (projectInfo as unknown) as Project);
-      });
-      afterEach(async () => {
-        await project.destroy();
-      });
-
+    describe('provide completion', () => {
       it('should autocomplete root translation in handlebars', async () => {
         expect(
-          await intlCompletionProvider.onComplete(project.normalizedPath, {
-            results: [],
-            type: 'template',
-            position: {
-              character: 19,
-              line: 1,
-            },
-            focusPath: {
-              node: {
-                type: 'StringLiteral',
-                value: 'rootFileTranslaELSCompletionDummy',
-              },
-              parent: {
-                type: 'MustacheStatement',
-                path: {
-                  original: 't',
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': '{{t "rootFileTransla" }}',
+                  },
                 },
+                translations,
               },
-            },
-          } as any)
+              'app/components/test.hbs',
+              { line: 0, character: 19 }
+            )
+          ).response
         ).toEqual([
           {
             detail: 'en-us : text 1',
@@ -230,12 +162,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'rootFileTranslation',
               range: {
                 end: {
-                  character: 4,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
                 start: {
-                  character: 4,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
               },
             },
@@ -245,26 +177,22 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
 
       it('should respect placeholder position in handlebars', async () => {
         expect(
-          await intlCompletionProvider.onComplete(project.normalizedPath, {
-            results: [],
-            type: 'template',
-            position: {
-              character: 19,
-              line: 1,
-            },
-            focusPath: {
-              node: {
-                type: 'StringLiteral',
-                value: 'rootFilELSCompletionDummyeTransla',
-              },
-              parent: {
-                type: 'MustacheStatement',
-                path: {
-                  original: 't',
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': '{{t "rootFileTransla" }}',
+                  },
                 },
+                translations,
               },
-            },
-          } as any)
+              'app/components/test.hbs',
+              { line: 0, character: 12 }
+            )
+          ).response
         ).toEqual([
           {
             detail: 'en-us : text 1',
@@ -274,12 +202,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'rootFileTranslation',
               range: {
                 end: {
-                  character: 12,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
                 start: {
-                  character: 12,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
               },
             },
@@ -289,26 +217,22 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
 
       it('should autocomplete sub folder translation in handlebars', async () => {
         expect(
-          await intlCompletionProvider.onComplete(project.normalizedPath, {
-            results: [],
-            type: 'template',
-            position: {
-              character: 19,
-              line: 1,
-            },
-            focusPath: {
-              node: {
-                type: 'StringLiteral',
-                value: 'subFolderTranslatELSCompletionDummy',
-              },
-              parent: {
-                type: 'MustacheStatement',
-                path: {
-                  original: 't',
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': `{{t "subFolderTranslat" }}`,
+                  },
                 },
+                translations,
               },
-            },
-          } as any)
+              'app/components/test.hbs',
+              { line: 0, character: 12 }
+            )
+          ).response
         ).toEqual([
           {
             detail: 'en-us : text 2',
@@ -318,12 +242,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'subFolderTranslation.subTranslation',
               range: {
                 end: {
-                  character: 2,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
                 start: {
-                  character: 2,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
               },
             },
@@ -336,12 +260,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'subFolderTranslation.anotherTranslation',
               range: {
                 end: {
-                  character: 2,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
                 start: {
-                  character: 2,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
               },
             },
@@ -350,37 +274,23 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
       });
 
       it('should autocomplete in JS files when in the end of expression', async () => {
-        const focusPathNode = {
-          type: 'StringLiteral',
-          value: 'subFolderTranslation.another',
-        };
-
         expect(
-          await intlCompletionProvider.onComplete(project.normalizedPath, {
-            results: [],
-            type: 'script',
-            position: {
-              character: 28 + 5 + 3, // subFolderTranslation.another|
-              line: 1,
-            },
-            focusPath: {
-              node: focusPathNode,
-              parent: {
-                type: 'CallExpression',
-                arguments: [focusPathNode],
-                callee: {
-                  type: 'MemberExpression',
-                  property: {
-                    type: 'Identifier',
-                    name: 't',
-                    loc: {
-                      start: { column: 5 },
-                    },
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.js': 'export default class Foo extends Bar { text = this.intl.t("subFolderTranslation.another"); }',
                   },
                 },
+                translations,
               },
-            },
-          } as any)
+              'app/components/test.js',
+              { line: 0, character: 86 }
+            )
+          ).response
         ).toEqual([
           {
             detail: 'en-us : another text',
@@ -390,12 +300,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'subFolderTranslation.anotherTranslation',
               range: {
                 end: {
-                  character: 8,
-                  line: 1,
+                  character: 59,
+                  line: 0,
                 },
                 start: {
-                  character: 8,
-                  line: 1,
+                  character: 59,
+                  line: 0,
                 },
               },
             },
@@ -404,37 +314,24 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
       });
 
       it('should autocomplete in JS files when in the middle of expression', async () => {
-        const focusPathNode = {
-          type: 'StringLiteral',
-          value: 'subFolderTranslation.another',
-        };
-        const result = await intlCompletionProvider.onComplete(project.normalizedPath, {
-          results: [],
-          type: 'script',
-          position: {
-            character: 5 + 5 + 3, // subFo|lderTranslation.another
-            line: 1,
-          },
-          focusPath: {
-            node: focusPathNode,
-            parent: {
-              type: 'CallExpression',
-              arguments: [focusPathNode],
-              callee: {
-                type: 'MemberExpression',
-                property: {
-                  type: 'Identifier',
-                  name: 't',
-                  loc: {
-                    start: { column: 5 },
+        expect(
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.js': `export default class Foo extends Bar { text = this.intl.t("subFolderTranslation.another"); }`,
                   },
                 },
+                translations,
               },
-            },
-          },
-        } as any);
-
-        expect(result).toEqual([
+              'app/components/test.js',
+              { line: 0, character: 64 }
+            )
+          ).response
+        ).toEqual([
           {
             detail: 'en-us : text 2',
             kind: 12,
@@ -443,12 +340,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'subFolderTranslation.subTranslation',
               range: {
                 end: {
-                  character: 8,
-                  line: 1,
+                  character: 59,
+                  line: 0,
                 },
                 start: {
-                  character: 8,
-                  line: 1,
+                  character: 59,
+                  line: 0,
                 },
               },
             },
@@ -461,12 +358,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'subFolderTranslation.anotherTranslation',
               range: {
                 end: {
-                  character: 8,
-                  line: 1,
+                  character: 59,
+                  line: 0,
                 },
                 start: {
-                  character: 8,
-                  line: 1,
+                  character: 59,
+                  line: 0,
                 },
               },
             },
@@ -475,61 +372,33 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
       });
     });
 
-    describe.skip('provide completion - YAML', () => {
-      let intlCompletionProvider: IntlCompletionProvider;
-      let project: any;
-
-      beforeEach(async () => {
-        intlCompletionProvider = new IntlCompletionProvider();
-        const server = {
-          fs: fsProvider(),
-        };
-
-        const projectInfo = {
-          addonsMeta: [],
-        };
-        const files = {
-          translations: {
-            'en-us.yaml': `rootFileTranslation: text 1`,
-            'sub-folder': {
-              'en-us.yaml': `subFolderTranslation: 
-                  subTranslation: text 2
-                  anotherTranslation: another text
-                `,
-            },
-          },
-        };
-
-        project = await createProject(files, connection);
-
-        intlCompletionProvider.onInit(server as Server, (projectInfo as unknown) as Project);
-      });
-      afterEach(async () => {
-        await project.destroy();
-      });
-
+    describe('provide completion - YAML', () => {
       it('should autocomplete root translation in handlebars', async () => {
         expect(
-          await intlCompletionProvider.onComplete(project.normalizedPath, {
-            results: [],
-            type: 'template',
-            position: {
-              character: 19,
-              line: 1,
-            },
-            focusPath: {
-              node: {
-                type: 'StringLiteral',
-                value: 'rootFileTranslaELSCompletionDummy',
-              },
-              parent: {
-                type: 'MustacheStatement',
-                path: {
-                  original: 't',
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': '{{t "rootFileTransla"}}',
+                  },
+                },
+                translations: {
+                  'en-us.yaml': `rootFileTranslation: text 1`,
+                  'sub-folder': {
+                    'en-us.yaml': `subFolderTranslation: 
+                        subTranslation: text 2
+                        anotherTranslation: another text
+                      `,
+                  },
                 },
               },
-            },
-          } as any)
+              'app/components/test.hbs',
+              { line: 0, character: 20 }
+            )
+          ).response
         ).toEqual([
           {
             detail: 'en-us : text 1',
@@ -539,12 +408,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'rootFileTranslation',
               range: {
                 end: {
-                  character: 4,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
                 start: {
-                  character: 4,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
               },
             },
@@ -554,26 +423,30 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
 
       it('should autocomplete sub folder translation in handlebars', async () => {
         expect(
-          await intlCompletionProvider.onComplete(project.normalizedPath, {
-            results: [],
-            type: 'template',
-            position: {
-              character: 19,
-              line: 1,
-            },
-            focusPath: {
-              node: {
-                type: 'StringLiteral',
-                value: 'subFolderTranslatELSCompletionDummy',
-              },
-              parent: {
-                type: 'MustacheStatement',
-                path: {
-                  original: 't',
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': '{{t "subFolderTranslat"}}',
+                  },
+                },
+                translations: {
+                  'en-us.yaml': `rootFileTranslation: text 1`,
+                  'sub-folder': {
+                    'en-us.yaml': `subFolderTranslation: 
+                        subTranslation: text 2
+                        anotherTranslation: another text
+                      `,
+                  },
                 },
               },
-            },
-          } as any)
+              'app/components/test.hbs',
+              { line: 0, character: 22 }
+            )
+          ).response
         ).toEqual([
           {
             detail: 'en-us : text 2',
@@ -583,12 +456,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'subFolderTranslation.subTranslation',
               range: {
                 end: {
-                  character: 2,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
                 start: {
-                  character: 2,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
               },
             },
@@ -601,12 +474,12 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               newText: 'subFolderTranslation.anotherTranslation',
               range: {
                 end: {
-                  character: 2,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
                 start: {
-                  character: 2,
-                  line: 1,
+                  character: 5,
+                  line: 0,
                 },
               },
             },
