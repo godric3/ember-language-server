@@ -7,6 +7,7 @@ import ScriptCompletionProvider from './../builtin-addons/core/script-completion
 import TemplateCompletionProvider from './../builtin-addons/core/template-completion-provider';
 import IntlCompletionProvider from '../builtin-addons/core/intl-completion-provider';
 import { AddonMeta, ProjectProviders } from './addon-api';
+import { logInfo } from './logger';
 
 export function initBuiltinProviders(addonsMeta: AddonMeta[]): ProjectProviders {
   const scriptDefinition = new CoreScriptDefinitionProvider();
@@ -41,6 +42,8 @@ export function initBuiltinProviders(addonsMeta: AddonMeta[]): ProjectProviders 
 
     initFunctions.push(intlCompletion.onInit.bind(intlCompletion));
     completionProviders.push(intlCompletion.onComplete.bind(intlCompletion));
+  } else {
+    logInfo('Detected project installed `els-intl-addon`, builtin intl addon will be disabled');
   }
 
   return {
