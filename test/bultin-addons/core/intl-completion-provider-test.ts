@@ -3,7 +3,7 @@ import { Readable, Writable } from 'stream';
 import { createMessageConnection, Disposable, Logger, MessageConnection } from 'vscode-jsonrpc';
 import { StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node';
 import { CompletionRequest } from 'vscode-languageserver-protocol';
-import { asyncFSProvider, getResult, initServer, registerCommandExecutor, startServer } from '../../test_helpers/integration-helpers';
+import { asyncFSProvider, getResult, initServer, makeProject, registerCommandExecutor, startServer } from '../../test_helpers/integration-helpers';
 
 const testCaseAsyncFsOptions = [false, true];
 const translations = {
@@ -97,40 +97,30 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
       });
 
       it('should not autocomplete if `els-intl-addon` installed', async () => {
-        expect(
-          (
-            await getResult(
-              CompletionRequest.method,
-              connection,
-              {
-                node_modules: {
-                  'els-intl-addon': {
-                    lib: {
-                      'index.js': 'module.exports.onComplete = function(root, { type }) { return null; }',
-                    },
-                    'package.json': JSON.stringify({
-                      name: 'els-intl-addon',
-                      'ember-language-server': {
-                        entry: './lib/index',
-                        capabilities: {
-                          completionProvider: true,
-                        },
-                      },
-                    }),
-                  },
-                },
-                app: {
-                  components: {
-                    'test.hbs': '{{t "rootFileTransla" }}',
-                  },
-                },
-                translations,
+        const files = makeProject(
+          {
+            app: {
+              components: {
+                'test.hbs': '{{t "rootFileTransla" }}',
               },
-              'app/components/test.hbs',
-              { line: 0, character: 19 }
-            )
-          ).response
-        ).toEqual([]);
+            },
+            translations,
+          },
+          {
+            'els-intl-addon': {
+              'package.json': JSON.stringify({
+                name: 'els-intl-addon',
+                'ember-language-server': {
+                  capabilities: {
+                    completionProvider: true,
+                  },
+                },
+              }),
+            },
+          }
+        );
+
+        expect((await getResult(CompletionRequest.method, connection, files, 'app/components/test.hbs', { line: 0, character: 19 })).response).toEqual([]);
       });
     });
 
@@ -313,7 +303,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
         ]);
       });
 
-      it('should autocomplete in JS files when in the middle of expression', async () => {
+      it('should autocomplete sub folder translation in JS', async () => {
         expect(
           (
             await getResult(
@@ -322,7 +312,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
               {
                 app: {
                   components: {
-                    'test.js': `export default class Foo extends Bar { text = this.intl.t("subFolderTranslation.another"); }`,
+                    'test.js': `export default class Foo extends Bar { text = this.intl.t("subFolderTranslation."); }`,
                   },
                 },
                 translations,
