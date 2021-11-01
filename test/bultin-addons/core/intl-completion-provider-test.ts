@@ -1,5 +1,5 @@
 import { MessageConnection } from 'vscode-jsonrpc';
-import { CompletionRequest } from 'vscode-languageserver-protocol';
+import { CompletionRequest, DefinitionRequest } from 'vscode-languageserver-protocol';
 import { createServer, ServerBucket, getResult, makeProject } from '../../test_helpers/public-integration-helpers';
 
 const testCaseAsyncFsOptions = [false, true];
@@ -14,6 +14,15 @@ const translations = {
         "anotherTranslation": "another text"
       }
     }`,
+  },
+};
+const translationsYaml = {
+  'en-us.yaml': `rootFileTranslation: text 1`,
+  'sub-folder': {
+    'en-us.yaml': `subFolderTranslation:
+        subTranslation: text 2
+        anotherTranslation: another text
+      `,
   },
 };
 
@@ -332,15 +341,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
                     'test.hbs': '{{t "rootFileTransla"}}',
                   },
                 },
-                translations: {
-                  'en-us.yaml': `rootFileTranslation: text 1`,
-                  'sub-folder': {
-                    'en-us.yaml': `subFolderTranslation:
-                        subTranslation: text 2
-                        anotherTranslation: another text
-                      `,
-                  },
-                },
+                translations: translationsYaml,
               },
               'app/components/test.hbs',
               { line: 0, character: 20 }
@@ -380,15 +381,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
                     'test.hbs': '{{t "subFolderTranslat"}}',
                   },
                 },
-                translations: {
-                  'en-us.yaml': `rootFileTranslation: text 1`,
-                  'sub-folder': {
-                    'en-us.yaml': `subFolderTranslation:
-                        subTranslation: text 2
-                        anotherTranslation: another text
-                      `,
-                  },
-                },
+                translations: translationsYaml,
               },
               'app/components/test.hbs',
               { line: 0, character: 22 }
@@ -429,6 +422,116 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
                   line: 0,
                 },
               },
+            },
+          },
+        ]);
+      });
+    });
+
+    describe('provide definition', () => {
+      it('should provide translation definition in handlebars', async () => {
+        expect(
+          ((await getResult(
+            DefinitionRequest.method,
+            connection,
+            {
+              app: {
+                components: {
+                  'test.hbs': '{{t "subFolderTranslation.subTranslation" }}',
+                },
+              },
+              translations,
+            },
+            'app/components/test.hbs',
+            { line: 0, character: 32 }
+          )) as any).response
+        ).toEqual([
+          {
+            uri: '/translations/sub-folder/en-us.json',
+            range: {
+              start: { line: 2, character: 8 },
+              end: { line: 2, character: 34 },
+            },
+          },
+        ]);
+      });
+      it('should provide translation definition in js', async () => {
+        expect(
+          ((await getResult(
+            DefinitionRequest.method,
+            connection,
+            {
+              app: {
+                components: {
+                  'test.js': 'export default class Foo extends Bar { text = this.intl.t("subFolderTranslation.anotherTranslation"); }',
+                },
+              },
+              translations,
+            },
+            'app/components/test.js',
+            { line: 0, character: 86 }
+          )) as any).response
+        ).toEqual([
+          {
+            uri: '/translations/sub-folder/en-us.json',
+            range: {
+              start: { line: 3, character: 8 },
+              end: { line: 3, character: 44 },
+            },
+          },
+        ]);
+      });
+    });
+
+    describe('provide definition -YAML', () => {
+      it('should provide translation definition in handlebars', async () => {
+        expect(
+          ((await getResult(
+            DefinitionRequest.method,
+            connection,
+            {
+              app: {
+                components: {
+                  'test.hbs': '{{t "subFolderTranslation.subTranslation" }}',
+                },
+              },
+              translations: translationsYaml,
+            },
+            'app/components/test.hbs',
+            { line: 0, character: 32 }
+          )) as any).response
+        ).toEqual([
+          {
+            uri: '/translations/sub-folder/en-us.yaml',
+            range: {
+              start: { line: 1, character: 8 },
+              end: { line: 1, character: 30 },
+            },
+          },
+        ]);
+      });
+      it('should provide translation definition in js', async () => {
+        expect(
+          ((await getResult(
+            DefinitionRequest.method,
+            connection,
+            {
+              app: {
+                components: {
+                  'test.js': 'export default class Foo extends Bar { text = this.intl.t("subFolderTranslation.anotherTranslation"); }',
+                },
+              },
+              translations: translationsYaml,
+            },
+            'app/components/test.js',
+            { line: 0, character: 86 }
+          )) as any).response
+        ).toEqual([
+          {
+            uri: '/translations/sub-folder/en-us.yaml',
+            range: {
+              start: { line: 2, character: 8 },
+              end: { line: 2, character: 40 },
             },
           },
         ]);
