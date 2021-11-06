@@ -143,11 +143,11 @@ function addToHashMap(hash: TranslationsHashMap, translationFile: TranslationFil
     if (extension === '.json' && translationFile.jsonAst) {
       position = traverseJsonAst(translationFile.jsonAst);
     } else if (extension === '.yaml' && translationFile.yamlAst) {
-      const x = traverseYamlAst(translationFile.yamlAst as YAML.YAMLMap<YAML.Scalar, YAML.Scalar | YAML.YAMLMap>);
+      const yamlPosition = traverseYamlAst(translationFile.yamlAst as YAML.YAMLMap<YAML.Scalar, YAML.Scalar | YAML.YAMLMap>);
 
-      if (x && x.start != null && x.end != null) {
-        const startPos = translationFile.yamlLineCounter?.linePos(x.start);
-        const endPos = translationFile.yamlLineCounter?.linePos(x.end);
+      if (yamlPosition && yamlPosition.start != null && yamlPosition.end != null) {
+        const startPos = translationFile.yamlLineCounter?.linePos(yamlPosition.start);
+        const endPos = translationFile.yamlLineCounter?.linePos(yamlPosition.end);
 
         if (startPos && endPos) {
           position = { start: { line: startPos.line, column: startPos.col }, end: { line: endPos.line, column: endPos.col } };
