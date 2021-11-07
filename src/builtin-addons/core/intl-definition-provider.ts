@@ -19,7 +19,7 @@ export default class IntlDefinitionProvider {
       const key = node.value;
 
       Object.keys(items).forEach((tr) => {
-        if (tr == key) {
+        if (tr === key) {
           items[tr].forEach((t) => {
             if (t.location) {
               results.push(t.location);

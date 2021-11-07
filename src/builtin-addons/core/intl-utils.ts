@@ -68,7 +68,7 @@ async function objFromFile(server: Server, filePath: string): Promise<Translatio
   if (ext === '.yaml') {
     const content = await server.fs.readFile(filePath);
 
-    if (content == null) {
+    if (content === null) {
       return {};
     }
 
@@ -79,7 +79,7 @@ async function objFromFile(server: Server, filePath: string): Promise<Translatio
   } else if (ext === '.json') {
     const content = await server.fs.readFile(filePath);
 
-    if (content == null) {
+    if (content === null) {
       return {};
     }
 
@@ -114,7 +114,7 @@ function addToHashMap(hash: TranslationsHashMap, translationFile: TranslationFil
           if (keys[keypos] === prop.key.value) {
             keypos++;
 
-            if (keypos == keys.length) {
+            if (keypos === keys.length) {
               return prop.loc;
             }
 
@@ -131,7 +131,7 @@ function addToHashMap(hash: TranslationsHashMap, translationFile: TranslationFil
         if (keys[keypos] === item.key.value) {
           keypos++;
 
-          if (keypos == keys.length) {
+          if (keypos === keys.length) {
             return { start: item.key.range?.[0], end: item.value?.range?.[1] };
           }
 

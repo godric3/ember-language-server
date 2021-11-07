@@ -7,6 +7,9 @@ const translations = {
   'en-us.json': `{
     "rootFileTranslation": "text 1"
   }`,
+  'pl-pl.json': `{
+    "rootFileTranslation": "text 1 in polish"
+  }`,
   'sub-folder': {
     'en-us.json': `{
       "subFolderTranslation": {
@@ -16,6 +19,12 @@ const translations = {
     }`,
   },
 };
+
+const translationsInvalid = {
+  'en-us.json': `
+    "rootFileTranslation": "text 1"
+  }`,
+};
 const translationsYaml = {
   'en-us.yaml': `rootFileTranslation: text 1`,
   'sub-folder': {
@@ -24,6 +33,10 @@ const translationsYaml = {
         anotherTranslation: another text
       `,
   },
+};
+
+const translationsYamlInvalid = {
+  'en-us.yaml': `rootFileTranslation text 1`,
 };
 
 for (const asyncFsEnabled of testCaseAsyncFsOptions) {
@@ -88,6 +101,48 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
 
         expect((await getResult(CompletionRequest.method, connection, files, 'app/components/test.hbs', { line: 0, character: 19 })).response).toEqual([]);
       });
+
+      it('should not autocomplete if invalid json file', async () => {
+        expect(
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': '{{t "rootFileTransla" }}',
+                  },
+                },
+                translations: translationsInvalid,
+              },
+              'app/components/test.hbs',
+              { line: 0, character: 12 }
+            )
+          ).response
+        ).toEqual([]);
+      });
+
+      it('should not autocomplete if invalid yaml file', async () => {
+        expect(
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': '{{t "rootFileTransla" }}',
+                  },
+                },
+                translations: translationsYamlInvalid,
+              },
+              'app/components/test.hbs',
+              { line: 0, character: 12 }
+            )
+          ).response
+        ).toEqual([]);
+      });
     });
 
     describe('provide completion', () => {
@@ -111,7 +166,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
           ).response
         ).toEqual([
           {
-            detail: 'en-us : text 1',
+            detail: 'en-us : text 1\npl-pl : text 1 in polish',
             kind: 12,
             label: 'rootFileTranslation',
             textEdit: {
@@ -151,7 +206,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
           ).response
         ).toEqual([
           {
-            detail: 'en-us : text 1',
+            detail: 'en-us : text 1\npl-pl : text 1 in polish',
             kind: 12,
             label: 'rootFileTranslation',
             textEdit: {
@@ -455,6 +510,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
           },
         ]);
       });
+
       it('should provide translation definition in js', async () => {
         expect(
           ((await getResult(
@@ -477,6 +533,40 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
             range: {
               start: { line: 3, character: 8 },
               end: { line: 3, character: 44 },
+            },
+          },
+        ]);
+      });
+
+      it('should provide translation definitions from multiple files', async () => {
+        expect(
+          ((await getResult(
+            DefinitionRequest.method,
+            connection,
+            {
+              app: {
+                components: {
+                  'test.js': 'export default class Foo extends Bar { text = this.intl.t("rootFileTranslation"); }',
+                },
+              },
+              translations,
+            },
+            'app/components/test.js',
+            { line: 0, character: 70 }
+          )) as any).response
+        ).toEqual([
+          {
+            uri: '/translations/en-us.json',
+            range: {
+              start: { line: 1, character: 4 },
+              end: { line: 1, character: 35 },
+            },
+          },
+          {
+            uri: '/translations/pl-pl.json',
+            range: {
+              start: { line: 1, character: 4 },
+              end: { line: 1, character: 45 },
             },
           },
         ]);
@@ -510,6 +600,7 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
           },
         ]);
       });
+
       it('should provide translation definition in js', async () => {
         expect(
           ((await getResult(
