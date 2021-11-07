@@ -2,7 +2,7 @@ import * as flat from 'flat';
 import { tokenize, parseTokens, AST } from 'json-parse-ast';
 import * as path from 'path';
 import * as YAML from 'yaml';
-import { Location, Range } from 'vscode-languageserver-types';
+import { Location, Range } from 'vscode-languageserver';
 import { URI } from 'vscode-uri';
 import { Server } from '../..';
 import { logDebugInfo } from '../../utils/logger';
