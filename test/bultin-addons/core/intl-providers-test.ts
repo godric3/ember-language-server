@@ -381,6 +381,47 @@ for (const asyncFsEnabled of testCaseAsyncFsOptions) {
           },
         ]);
       });
+      it('should autocomplete translation base on translation text', async () => {
+        expect(
+          (
+            await getResult(
+              CompletionRequest.method,
+              connection,
+              {
+                app: {
+                  components: {
+                    'test.hbs': `{{t "polish" }}`,
+                  },
+                },
+                translations,
+              },
+              'app/components/test.hbs',
+              { line: 0, character: 8 }
+            )
+          ).response
+        ).toEqual([
+          {
+            documentation: 'en-us : text 1\npl-pl : text 1 in polish',
+            filterText: 'text 1 in polish pl-pl',
+            kind: 12,
+            label: 'text 1 in polish',
+            textEdit: {
+              newText: 'rootFileTranslation',
+
+              range: {
+                end: {
+                  character: 5,
+                  line: 0,
+                },
+                start: {
+                  character: 5,
+                  line: 0,
+                },
+              },
+            },
+          },
+        ]);
+      });
     });
 
     describe('provide completion - YAML', () => {
