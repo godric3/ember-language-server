@@ -54,7 +54,7 @@ export default class IntlCompletionProvider {
                 end: endPosition,
               },
             },
-            detail: detail,
+            documentation: detail,
           });
         }
 

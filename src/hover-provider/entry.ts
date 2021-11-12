@@ -11,10 +11,17 @@ export class HoverProvider {
       return null;
     }
 
-    const addonResults = await queryELSAddonsAPIChain(project.providers.hoverProviders, project.root, {
+    const internalResults = await queryELSAddonsAPIChain(project.builtinProviders.hoverProviders, project.root, {
       textDocument,
       position,
       results: [],
+      server: this.server,
+    });
+
+    const addonResults = await queryELSAddonsAPIChain(project.providers.hoverProviders, project.root, {
+      textDocument,
+      position,
+      results: internalResults,
       server: this.server,
     });
 
