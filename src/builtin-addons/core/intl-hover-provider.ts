@@ -1,13 +1,9 @@
-import { preprocess } from '@glimmer/syntax';
-import { parseScriptFile } from 'ember-meta-explorer';
+import { ASTv1 } from '@glimmer/syntax';
 import { Hover } from 'vscode-languageserver';
 import { Server } from '../..';
-import { toPosition } from '../../estree-utils';
-import ASTPath, { nodeLoc } from '../../glimmer-utils';
+import { nodeLoc } from '../../glimmer-utils';
 import { HoverFunctionParams } from '../../utils/addon-api';
 import { isLocalizationHelperTranslataionName } from '../../utils/ast-helpers';
-import { isScriptPath, isTemplatePath } from '../../utils/layout-helpers';
-import { logDebugInfo } from '../../utils/logger';
 import { getTranslations } from './intl-utils';
 
 export default class IntlHoverProvider {
@@ -17,38 +13,10 @@ export default class IntlHoverProvider {
   }
 
   async onHover(root: string, params: HoverFunctionParams): Promise<Hover[]> {
-    const { textDocument, results, position } = params;
+    const { results, focusPath, type } = params;
 
-    const document = this.server.documents.get(textDocument.uri);
-    const content = document?.getText();
-
-    if (!content) {
-      return results;
-    }
-
-    let ast = null;
-    let filetype: 'script' | 'template';
-
-    try {
-      if (isScriptPath(textDocument.uri)) {
-        ast = parseScriptFile(content);
-        filetype = 'script';
-      } else if (isTemplatePath(textDocument.uri)) {
-        ast = preprocess(content);
-        filetype = 'template';
-      } else {
-        return results;
-      }
-    } catch (e) {
-      logDebugInfo('error', e);
-
-      return results;
-    }
-
-    const focusPath: ASTPath = ASTPath.toPosition(ast, toPosition(position), content) as any;
-
-    if (isLocalizationHelperTranslataionName(focusPath, filetype)) {
-      const node = focusPath.node as any;
+    if (isLocalizationHelperTranslataionName(focusPath, type)) {
+      const node = focusPath.node as ASTv1.StringLiteral;
       const key = node.value;
       const translations = await getTranslations(root, this.server);
       const location = nodeLoc(node);
