@@ -4,7 +4,7 @@ import { Server } from '../..';
 import { nodeLoc } from '../../glimmer-utils';
 import { HoverFunctionParams } from '../../utils/addon-api';
 import { isLocalizationHelperTranslataionName } from '../../utils/ast-helpers';
-import { getTranslations } from './intl-utils';
+import { getTranslations } from '../../utils/intl-utils';
 
 export default class IntlHoverProvider {
   server: Server;

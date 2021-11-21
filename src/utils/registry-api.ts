@@ -3,6 +3,7 @@ import { isRootStartingWithFilePath, isTemplatePath, normalizeRoutePath } from '
 import { MatchResult } from './path-matcher';
 import * as path from 'path';
 import { logDebugInfo } from './logger';
+import { updateTranslationTokens } from './intl-utils';
 
 type GLOBAL_REGISTRY_ITEM = Map<string, Set<string>>;
 export type REGISTRY_KIND = 'transform' | 'helper' | 'component' | 'routePath' | 'model' | 'service' | 'modifier';
@@ -192,6 +193,8 @@ export function addToRegistry(normalizedName: string, kind: REGISTRY_KIND, files
 
         if (canCollectTemplateTokens() && (kind === 'component' || kind === 'routePath') && isTemplatePath(file)) {
           updateTemplateTokens(kind, normalizedName, file);
+          updateTranslationTokens(kind, normalizedName, file);
+          // we need to call this for all files that can contain intl helper, so we need parse both templates and scripts
         }
       });
     }

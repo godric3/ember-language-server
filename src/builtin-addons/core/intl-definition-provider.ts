@@ -1,7 +1,7 @@
-import { Definition } from 'vscode-languageserver';
+import { Definition, Location } from 'vscode-languageserver';
 import { DefinitionFunctionParams, Server } from '../..';
 import { isLocalizationHelperTranslataionName } from '../../utils/ast-helpers';
-import { getTranslations } from './intl-utils';
+import { getTranslations2 } from '../../utils/intl-utils';
 
 export default class IntlDefinitionProvider {
   server: Server;
@@ -14,19 +14,17 @@ export default class IntlDefinitionProvider {
     const { focusPath, type, results } = params;
 
     if (isLocalizationHelperTranslataionName(focusPath, type)) {
-      const items = await getTranslations(root, this.server);
+      const items = getTranslations2();
       const node = focusPath.node as any;
       const key = node.value;
 
-      Object.keys(items).forEach((tr) => {
-        if (tr === key) {
-          items[tr].forEach((t) => {
-            if (t.location) {
-              results.push(t.location);
-            }
+      Object.keys(items)
+        .filter((k) => k === key)
+        .forEach((tr) => {
+          items[tr].locales.forEach((locale) => {
+            results.push(Location.create(locale.file, locale.range));
           });
-        }
-      });
+        });
     }
 
     return results;

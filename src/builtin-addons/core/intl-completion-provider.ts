@@ -1,7 +1,7 @@
 import { CompletionItem, CompletionItemKind } from 'vscode-languageserver';
 import { CompletionFunctionParams, Server } from '../..';
 import { isLocalizationHelperTranslataionName } from '../../utils/ast-helpers';
-import { getTranslations } from './intl-utils';
+import { getTranslations } from '../../utils/intl-utils';
 
 export default class IntlCompletionProvider {
   server: Server;
